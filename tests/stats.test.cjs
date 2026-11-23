@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict');
+const {summary,groups,timestamp,mean,patientRows,historyRows}=require('../public/stats.js');
+function r(id,group,minute,sys,dia=80,extra={}){return {id,uuid:'r'+id,group_uuid:group,kind:'bp',patient_id:1,measured_at:`2026-10-23 08:${String(minute).padStart(2,'0')}:00`,systolic:sys,diastolic:dia,pulse:70,slot:'morning',voided_at:null,...extra};}
+assert.equal(mean([]),null);
+const rows=[r(2,'a',1,140),r(1,'a',0,120),r(3,'b',20,110)];
+const s=summary(rows);
+assert.equal(s.count,2);assert.equal(s.single,1);assert.equal(s.systolic,120);assert.equal(s.groups[0].systolic,130);assert.equal(s.groups[0].gap,1);assert.equal(s.groups[0].rows[0].id,1);
+assert.equal(summary([...rows,r(4,'c',30,250,180,{voided_at:'2026-10-23 05:00:00'})]).systolic,120);
+assert.equal(summary([...rows,{kind:'glucose',glucose:100}]).count,2);
+assert.equal(groups([r(1,'a',0,120),r(2,'a',0,125)])[0].gap,0);
+assert.equal(timestamp(r(1,'a',0,120)),Date.parse('2026-10-23T04:30:00Z'));
+assert.equal(summary([]).systolic,null);
+assert.equal(groups([r(1,'a',0,120),r(2,'a',1,140,80,{voided_at:'x'})])[0].rows.length,1);
+assert.equal(summary([r(1,'a',0,120),r(2,'b',1,140,80,{slot:'evening'})]).evening,1);
+const mixed=[r(1,'a',0,120),r(2,'b',1,130,80,{patient_id:2}),r(3,'c',2,140,80,{voided_at:'2026-10-23 05:00:00'}),r(4,'d',3,150,80,{kind:'glucose'})];
+assert.deepEqual(patientRows(mixed,1).map(x=>x.id),[1,3,4]);
+assert.deepEqual(historyRows(mixed,1).map(x=>x.id),[4,1]);
+assert.deepEqual(historyRows(mixed,1,{includeVoided:true,from:'2026-10-23',to:'2026-10-23',kind:'bp'}).map(x=>x.id),[3,1]);
+assert.deepEqual(historyRows(mixed,2).map(x=>x.id),[2]);
+console.log('Statistics tests passed: profile/report isolation, filters, grouping, ordering, interval, equal session weighting, void exclusion, empty data, glucose separation, Tehran time.');
